@@ -47,7 +47,6 @@ export const vehiclesApi = {
 export const dealsApi = {
   getAll: () => api.get('/deals'),
   getById: (id: string) => api.get(`/deals/${id}`),
-  getById: (id: string) => api.get(`/deals/${id}`),
   create: (data: { vehicleId: string; sellerId: string }) => api.post('/deals', data),
   updateStatus: (id: string, data: { status: string; offeredPrice?: number }) =>
     api.put(`/deals/${id}/status`, data),
