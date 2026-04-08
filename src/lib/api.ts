@@ -9,7 +9,7 @@ export const api = axios.create({
   },
 })
 
-console.log("API_URL: ", API_URL)
+console.log("API_URL::: ", API_URL)
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
