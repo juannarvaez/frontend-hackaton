@@ -21,6 +21,8 @@ export default function LoginPage() {
     }
   }
 
+  console.log("testing...")
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] p-4">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary-900/20 via-[#0a0a0b] to-[#0a0a0b]" />
