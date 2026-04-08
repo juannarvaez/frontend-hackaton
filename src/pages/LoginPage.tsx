@@ -33,7 +33,7 @@ export default function LoginPage() {
             <Car className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">Deal Room!!</h1>
-          <p className="text-zinc-500 mt-2">AI-Assisted Car Sales</p>
+          <p className="text-zinc-500 mt-2">: AI-Assisted Car Sales :</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
