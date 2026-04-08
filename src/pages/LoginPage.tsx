@@ -32,7 +32,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 mb-4">
             <Car className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Deal Room</h1>
+          <h1 className="text-3xl font-bold text-white">Deal Room!!</h1>
           <p className="text-zinc-500 mt-2">AI-Assisted Car Sales</p>
         </div>
 
