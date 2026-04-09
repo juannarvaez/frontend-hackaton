@@ -1,180 +1,201 @@
 import { useState, useEffect, useRef } from 'react'
+import { Trash2 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth'
 
 interface TranscriptMessage {
   id: string
-  speaker: 'host' | 'invited'
   text: string
   timestamp: Date
 }
 
-interface VoiceTranscriptionProps {
-  isInCall: boolean
-  localStream: MediaStream | null
-  remoteStream: MediaStream | null
-  currentUserId: string
-  otherUserName: string
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: any
-    webkitSpeechRecognition: any
-  }
-}
-
-export default function VoiceTranscription({ 
-  isInCall, 
-  localStream, 
-  remoteStream,
-  currentUserId,
-  otherUserName 
-}: VoiceTranscriptionProps) {
+export default function VoiceTranscription() {
+  const { user } = useAuthStore()
   const [messages, setMessages] = useState<TranscriptMessage[]>([])
   const [isListening, setIsListening] = useState(false)
+  const [isSupported, setIsSupported] = useState(true)
+  const [currentTranscript, setCurrentTranscript] = useState('')
+  const [micPermission, setMicPermission] = useState<'pending' | 'granted' | 'denied'>('pending')
   const recognitionRef = useRef<any>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const userName = user?.name || 'Usuario'
 
   useEffect(() => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      console.log('Speech recognition not supported')
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    
+    if (!SpeechRecognition) {
+      setIsSupported(false)
       return
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognition()
-    
     recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = 'es-ES'
-    
+
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results)
-        .map(result => result[0].transcript)
-        .join('')
-      
-      if (transcript.trim() && event.results[event.results.length - 1].isFinal) {
+      let finalTranscript = ''
+      let interimTranscript = ''
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript
+        } else {
+          interimTranscript += transcript
+        }
+      }
+
+      if (interimTranscript.trim()) {
+        setCurrentTranscript(interimTranscript.trim())
+      }
+
+      if (finalTranscript.trim()) {
         const newMessage: TranscriptMessage = {
           id: Date.now().toString(),
-          speaker: 'host',
-          text: transcript.trim(),
+          text: finalTranscript.trim(),
           timestamp: new Date()
         }
         setMessages(prev => [...prev, newMessage])
+        setCurrentTranscript('')
       }
     }
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error)
-      if (event.error !== 'aborted') {
+      if (event.error === 'not-allowed') {
+        setMicPermission('denied')
         setIsListening(false)
       }
     }
 
     recognition.onend = () => {
-      if (isInCall && isListening) {
+      if (isListening) {
         try {
           recognition.start()
         } catch (e) {
-          console.log('Recognition already started')
+          console.log('Recognition restart error:', e)
         }
       }
     }
 
     recognitionRef.current = recognition
 
+    const startRecognition = async () => {
+      try {
+        await recognition.start()
+        setIsListening(true)
+        setMicPermission('granted')
+      } catch (e: any) {
+        console.log('Start error:', e.message)
+        if (e.message.includes('permission')) {
+          setMicPermission('denied')
+        }
+      }
+    }
+
+    startRecognition()
+
     return () => {
+      setIsListening(false)
       try {
         recognition.stop()
-      } catch (e) {
-        console.log('Recognition already stopped')
-      }
+      } catch (e) {}
     }
-  }, [isInCall])
+  }, [])
 
-  useEffect(() => {
-    if (!recognitionRef.current) return
-    
-    if (isInCall && !isListening) {
-      try {
-        recognitionRef.current.start()
-        setIsListening(true)
-      } catch (e) {
-        console.log('Recognition already started:', e)
-      }
-    } else if (!isInCall && isListening) {
-      try {
-        recognitionRef.current.stop()
-        setIsListening(false)
-      } catch (e) {
-        console.log('Recognition already stopped:', e)
-      }
-    }
-  }, [isInCall])
+  const clearMessages = () => {
+    setMessages([])
+  }
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
   }
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, currentTranscript])
+
+  if (!isSupported) {
+    return (
+      <div className="h-full flex flex-col bg-[#0a0a0b] p-4">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-zinc-500">
+            <p>Tu navegador no soporta reconocimiento de voz</p>
+            <p className="text-xs mt-2">Prueba con Chrome o Edge</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (micPermission === 'denied') {
+    return (
+      <div className="h-full flex flex-col bg-[#0a0a0b] p-4">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-zinc-500">
+            <p>Permiso de micrófono denegado</p>
+            <p className="text-xs mt-2">Por favor permite el acceso al micrófono en tu navegador</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col bg-[#0a0a0b]">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#27272a]">
-        <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-zinc-500'}`} />
-        <Mic className="w-4 h-4 text-zinc-500" />
-        <span className="text-sm font-medium text-white">Transcripción de Voz</span>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#27272a]">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-yellow-500 animate-pulse'}`} />
+          <span className="text-sm font-medium text-white">Transcripción de Voz</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={clearMessages}
+            className="p-2 text-zinc-500 hover:text-white transition-colors"
+            title="Limpiar mensajes"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !currentTranscript ? (
           <div className="text-center text-zinc-500 text-sm py-8">
-            <Mic className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>Escuchando...</p>
-            <p className="text-xs mt-1">Las palabras reconocidas aparecerán aquí</p>
+            <p>{isListening ? 'Escuchando...' : 'Iniciando...'}</p>
+            <p className="text-xs mt-1">Tu voz será convertida a texto automáticamente</p>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.speaker === 'host' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] px-3 py-2 rounded-xl ${
-                msg.speaker === 'host' 
-                  ? 'bg-primary-500/20 border border-primary-500/30 text-white' 
-                  : 'bg-[#1c1c1f] text-white'
-              }`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-medium text-primary-400">
-                    {msg.speaker === 'host' ? 'Tú' : otherUserName}
-                  </span>
-                  <span className="text-xs text-zinc-500">{formatTime(msg.timestamp)}</span>
+          <>
+            {messages.map((msg) => (
+              <div key={msg.id} className="flex justify-start">
+                <div className="max-w-[90%] px-4 py-3 rounded-2xl bg-primary-500/20 border border-primary-500/30">
+                  <p className="text-xs font-medium text-primary-400 mb-1">{userName}:</p>
+                  <p className="text-sm text-white">{msg.text}</p>
+                  <p className="text-xs text-zinc-500 mt-1">{formatTime(msg.timestamp)}</p>
                 </div>
-                <p className="text-sm">{msg.text}</p>
               </div>
-            </div>
-          ))
+            ))}
+            {currentTranscript && (
+              <div className="flex justify-start">
+                <div className="max-w-[90%] px-4 py-3 rounded-2xl bg-zinc-700/50 border border-zinc-600">
+                  <p className="text-xs font-medium text-zinc-400 mb-1">{userName}:</p>
+                  <p className="text-sm text-zinc-300 italic">{currentTranscript}...</p>
+                </div>
+              </div>
+            )}
+          </>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="p-3 border-t border-[#27272a]">
         <div className="flex items-center justify-between text-xs text-zinc-500">
-          <span>{isListening ? 'Escuchando...' : 'Inactivo'}</span>
-          <span>{messages.length} mensajes</span>
+          <span>{isListening ? '🔴 Escuchando' : 'Iniciando...'}</span>
+          <span>{messages.length} transcript{messages.length !== 1 ? 's' : ''}</span>
         </div>
       </div>
     </div>
-  )
-}
-
-function Mic({ className }: { className?: string }) {
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" x2="12" y1="19" y2="22" />
-    </svg>
   )
 }

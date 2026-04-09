@@ -10,6 +10,7 @@ import VehicleDetailPage from './pages/VehicleDetailPage'
 import DealRoomPage from './pages/DealRoomPage'
 import CreateVehiclePage from './pages/CreateVehiclePage'
 import RoomsPage from './pages/RoomsPage'
+import VoiceTranscriptionPage from './pages/VoiceTranscriptionPage'
 
 function LoadingScreen() {
   return (
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="vehicles/:id" element={<VehicleDetailPage />} />
         <Route path="rooms" element={<RoomsPage />} />
         <Route path="deals/:id" element={<DealRoomPage />} />
+        <Route path="voice-transcription" element={<VoiceTranscriptionPage />} />
       </Route>
     </Routes>
   )

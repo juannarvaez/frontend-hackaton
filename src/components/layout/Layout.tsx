@@ -7,7 +7,8 @@ import {
   MessageCircle,
   Users,
   Plus,
-  Video
+  Video,
+  Mic
 } from 'lucide-react'
 
 export default function Layout() {
@@ -19,6 +20,7 @@ export default function Layout() {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/vehicles', label: 'Vehículos', icon: Car },
     { path: '/rooms', label: 'Rooms', icon: Video },
+    { path: '/voice-transcription', label: 'Voice Transcription', icon: Mic },
   ]
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/')
@@ -43,7 +45,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav id="main-menu" className="flex-1 p-4 space-y-1">
           {navItems.map((item) => (
             <Link
               key={item.path}
