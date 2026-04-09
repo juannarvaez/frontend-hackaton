@@ -18,6 +18,17 @@ export default function VehiclesPage() {
   })
 
   const vehicles = data?.data || []
+  
+  const getVehicleImages = (vehicle: any) => {
+    if (!vehicle.images) return []
+    if (Array.isArray(vehicle.images)) return vehicle.images
+    try {
+      return JSON.parse(vehicle.images)
+    } catch {
+      return []
+    }
+  }
+
   const filteredVehicles = vehicles.filter((v: any) =>
     search ? `${v.make} ${v.model} ${v.year}`.toLowerCase().includes(search.toLowerCase()) : true
   )
@@ -77,8 +88,8 @@ export default function VehiclesPage() {
               className="bg-[#141416] rounded-2xl border border-[#27272a] overflow-hidden hover:border-zinc-600 transition-all group"
             >
               <div className="aspect-video bg-[#1c1c1f] relative overflow-hidden">
-                {vehicle.images?.[0] ? (
-                  <img src={vehicle.images[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                {getVehicleImages(vehicle)[0] ? (
+                  <img src={getVehicleImages(vehicle)[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Car className="w-16 h-16 text-zinc-700" />

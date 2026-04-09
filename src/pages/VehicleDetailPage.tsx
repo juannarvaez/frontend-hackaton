@@ -63,6 +63,16 @@ const createDealMutation = useMutation({
   const transmission = vehicle?.transmission || 'AUTOMATIC'
   const isOwner = user && vehicle?.seller?.id === user.id
 
+  const getVehicleImages = (v: any) => {
+    if (!v?.images) return []
+    if (Array.isArray(v.images)) return v.images
+    try {
+      return JSON.parse(v.images)
+    } catch {
+      return []
+    }
+  }
+
   const handleStartDeal = () => {
     if (!user) {
       toast.error('Debes iniciar sesión')
@@ -90,8 +100,8 @@ const createDealMutation = useMutation({
         <div className="lg:col-span-2">
           <div className="bg-[#141416] rounded-2xl border border-[#27272a] overflow-hidden">
             <div className="aspect-video bg-[#1c1c1f]">
-              {vehicle.images?.[0] ? (
-                <img src={vehicle.images[0]} alt="" className="w-full h-full object-cover" />
+              {getVehicleImages(vehicle)?.[0] ? (
+                <img src={getVehicleImages(vehicle)[0]} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Car className="w-24 h-24 text-zinc-700" />

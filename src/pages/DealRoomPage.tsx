@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { Message } from '@/types'
 import VoiceTranscription from '@/components/VoiceTranscription'
+import AIDealAssistant from '@/components/AIDealAssistant'
 
 export default function DealRoomPage() {
   const { id } = useParams()
@@ -31,6 +32,8 @@ export default function DealRoomPage() {
   const [hasOtherUserJoined, setHasOtherUserJoined] = useState(false)
   const [hasRemoteStream, setHasRemoteStream] = useState(false)
   const [streamReady, setStreamReady] = useState(false)
+  const [vehicleTab, setVehicleTab] = useState<'info' | 'images'>('info')
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0)
   
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -56,6 +59,16 @@ export default function DealRoomPage() {
   const isSeller = user && deal?.seller?.id === user.id
   const otherUser = isSeller ? deal?.buyer : deal?.seller
   const vehicle = deal?.vehicle
+
+  const getVehicleImages = (v: any) => {
+    if (!v?.images) return []
+    if (Array.isArray(v.images)) return v.images
+    try {
+      return JSON.parse(v.images)
+    } catch {
+      return []
+    }
+  }
 
   const sendMessageMutation = useMutation({
     mutationFn: (content: string) => roomsApi.sendMessage(deal?.room?.id!, { content }),
@@ -605,17 +618,144 @@ export default function DealRoomPage() {
 
         <div className="flex-1 border-l border-[#27272a] overflow-auto">
           <div className="p-4 border-b border-[#27272a]">
-            <h2 className="font-semibold text-white mb-3">Información del Vehículo</h2>
-            <div className="aspect-video bg-[#1c1c1f] rounded-xl mb-3 overflow-hidden">
-              {vehicle?.images?.[0] ? (
-                <img src={vehicle.images[0]} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Car className="w-12 h-12 text-zinc-700" />
+            <div id="vehicle-data">
+              {/* <h2 className="font-semibold text-white mb-3">Información del Vehículo</h2> */}
+              
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setVehicleTab('info')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    vehicleTab === 'info' ? 'bg-primary-500 text-white' : 'bg-[#1c1c1f] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Info
+                </button>
+                <button
+                  onClick={() => setVehicleTab('images')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                    vehicleTab === 'images' ? 'bg-primary-500 text-white' : 'bg-[#1c1c1f] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Images
+                </button>
+              </div>
+
+              {vehicleTab === 'info' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-r from-primary-500/20 to-accent-500/20 rounded-xl border border-primary-500/30">
+                    <p className="text-xs text-primary-400/70 uppercase tracking-wider mb-1">Precio</p>
+                    <p className="text-3xl font-bold text-primary-400">${vehicle?.price?.toLocaleString()}</p>
+                  </div>
+
+                  <div className="bg-[#141416] rounded-xl p-4 border border-[#27272a]">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Marca</span>
+                        <span className="text-white font-medium">{vehicle?.make}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Modelo</span>
+                        <span className="text-white font-medium">{vehicle?.model}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Año</span>
+                        <span className="text-white font-medium">{vehicle?.year}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Km</span>
+                        <span className="text-white font-medium">{vehicle?.mileage?.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Color</span>
+                        <span className="text-white font-medium">{vehicle?.color || '-'}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Combustible</span>
+                        <span className="text-white font-medium">{vehicle?.fuelType}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Transmisión</span>
+                        <span className="text-white font-medium">{vehicle?.transmission}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-[#27272a]">
+                        <span className="text-zinc-500">Condición</span>
+                        <span className={`font-medium ${vehicle?.condition === 'EXCELLENT' ? 'text-green-400' : vehicle?.condition === 'GOOD' ? 'text-yellow-400' : 'text-orange-400'}`}>{vehicle?.condition}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 pt-3 border-t border-[#27272a]">
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-500 text-sm">VIN</span>
+                        <span className="text-white font-mono text-xs bg-zinc-800 px-2 py-1 rounded">{vehicle?.vin}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {vehicle?.description && (
+                    <div className="p-3 bg-[#1c1c1f] rounded-lg border border-[#27272a]">
+                      <p className="text-xs text-zinc-500 mb-2 uppercase tracking-wider">Descripción</p>
+                      <p className="text-sm text-zinc-300 leading-relaxed">{vehicle.description}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {vehicleTab === 'images' && (
+                <div className="space-y-3">
+                  {getVehicleImages(vehicle).length > 0 ? (
+                    <>
+                      <div className="aspect-video rounded-xl overflow-hidden bg-[#1c1c1f] border border-[#27272a]">
+                        <img 
+                          src={getVehicleImages(vehicle)[selectedImageIndex]} 
+                          alt={`Vehicle ${selectedImageIndex + 1}`} 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {getVehicleImages(vehicle).map((img, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedImageIndex(idx)}
+                            className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                              idx === selectedImageIndex 
+                                ? 'border-primary-500 ring-2 ring-primary-500/50' 
+                                : 'border-transparent hover:border-zinc-600'
+                            }`}
+                          >
+                            <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm text-zinc-500">
+                        <span>{selectedImageIndex + 1} / {getVehicleImages(vehicle).length}</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setSelectedImageIndex(Math.max(0, selectedImageIndex - 1))}
+                            disabled={selectedImageIndex === 0}
+                            className="p-2 bg-[#1c1c1f] rounded-lg hover:bg-[#27272a] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ←
+                          </button>
+                          <button
+                            onClick={() => setSelectedImageIndex(Math.min(getVehicleImages(vehicle).length - 1, selectedImageIndex + 1))}
+                            disabled={selectedImageIndex === getVehicleImages(vehicle).length - 1}
+                            className="p-2 bg-[#1c1c1f] rounded-lg hover:bg-[#27272a] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            →
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="aspect-video bg-[#1c1c1f] rounded-lg flex items-center justify-center">
+                      <Car className="w-12 h-12 text-zinc-700" />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            <p className="text-xl font-bold text-primary-400">${vehicle?.price?.toLocaleString()}</p>
             {vehicle?.aiAnalysis && (
               <div className="mt-3 p-3 bg-[#1c1c1f] rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
@@ -635,14 +775,14 @@ export default function DealRoomPage() {
               </div>
             )}
             <div id="ia-deal-assistant" className="mt-3 p-3 bg-[#1c1c1f] rounded-xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="w-4 h-4 text-primary-400" />
-                  <span className="text-sm text-white">IA Assistant</span>
-                </div>
-              </div>
+              <AIDealAssistant 
+                chatMessages={messages}
+                isInCall={isInCall}
+              />
+            </div>
           </div>
 
-          <div className="p-4 border-b border-[#27272a]">
+          {/* <div className="p-4 border-b border-[#27272a]">
             <h2 className="font-semibold text-white mb-3">Contraparte</h2>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#1c1c1f] flex items-center justify-center">
@@ -653,7 +793,7 @@ export default function DealRoomPage() {
                 <p className="text-xs text-zinc-500">{otherUser?.email}</p>
               </div>
             </div>
-          </div>
+          </div> */}
 
           <div className="p-4">
             <h2 className="font-semibold text-white mb-3">Opciones</h2>

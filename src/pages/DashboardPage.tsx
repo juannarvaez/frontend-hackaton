@@ -21,6 +21,16 @@ export default function DashboardPage() {
   const activeDeals = deals?.data?.filter((d: any) => d.status === 'PENDING' || d.status === 'NEGOTIATING') || []
   const completedDeals = deals?.data?.filter((d: any) => d.status === 'ACCEPTED') || []
 
+  const getVehicleImages = (vehicle: any) => {
+    if (!vehicle.images) return []
+    if (Array.isArray(vehicle.images)) return vehicle.images
+    try {
+      return JSON.parse(vehicle.images)
+    } catch {
+      return []
+    }
+  }
+
   const stats = [
     { label: 'Mis Vehículos', value: myVehicles.length, icon: Car, color: 'text-primary-400' },
     { label: 'Negociaciones Activas', value: activeDeals.length, icon: TrendingUp, color: 'text-accent-400' },
@@ -69,8 +79,8 @@ export default function DashboardPage() {
               {myVehicles.slice(0, 3).map((vehicle: any) => (
                 <Link key={vehicle.id} to={`/vehicles/${vehicle.id}`} className="flex items-center gap-4 p-4 bg-[#1c1c1f] rounded-xl hover:bg-[#27272a] transition-colors">
                   <div className="w-16 h-16 rounded-lg bg-zinc-800 overflow-hidden">
-                    {vehicle.images?.[0] ? (
-                      <img src={vehicle.images[0]} alt={vehicle.model} className="w-full h-full object-cover" />
+                    {getVehicleImages(vehicle)[0] ? (
+                      <img src={getVehicleImages(vehicle)[0]} alt={vehicle.model} className="w-full h-full object-cover" />
                     ) : (
                       <Car className="w-full h-full p-4 text-zinc-600" />
                     )}
@@ -107,8 +117,8 @@ export default function DashboardPage() {
               {activeDeals.slice(0, 3).map((deal: any) => (
                 <Link key={deal.id} to={`/deals/${deal.id}`} className="flex items-center gap-4 p-4 bg-[#1c1c1f] rounded-xl hover:bg-[#27272a] transition-colors">
                   <div className="w-16 h-16 rounded-lg bg-zinc-800 overflow-hidden">
-                    {deal.vehicle?.images?.[0] ? (
-                      <img src={deal.vehicle.images[0]} alt="" className="w-full h-full object-cover" />
+                    {getVehicleImages(deal.vehicle)?.[0] ? (
+                      <img src={getVehicleImages(deal.vehicle)[0]} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <Car className="w-full h-full p-4 text-zinc-600" />
                     )}
