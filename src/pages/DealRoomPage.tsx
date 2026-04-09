@@ -25,6 +25,8 @@ export default function DealRoomPage() {
   const [isInCall, setIsInCall] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [hasRemoteStream, setHasRemoteStream] = useState(false)
   
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -33,6 +35,12 @@ export default function DealRoomPage() {
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const isAudioOnRef = useRef(true)
+
+  const handleAcceptCallRef = useRef<any>(null)
+  const handleRemoteAnswerRef = useRef<any>(null)
+  const handleIceCandidateRef = useRef<any>(null)
 
   const { data: dealData, isLoading } = useQuery({
     queryKey: ['deal', id],
@@ -40,14 +48,14 @@ export default function DealRoomPage() {
     enabled: !!id,
   })
 
-  const sendMessageMutation = useMutation({
-    mutationFn: (content: string) => roomsApi.sendMessage(deal?.room?.id!, { content }),
-  })
-
   const deal = dealData?.data
   const isSeller = user && deal?.seller?.id === user.id
   const otherUser = isSeller ? deal?.buyer : deal?.seller
   const vehicle = deal?.vehicle
+
+  const sendMessageMutation = useMutation({
+    mutationFn: (content: string) => roomsApi.sendMessage(deal?.room?.id!, { content }),
+  })
 
   useEffect(() => {
     if (!deal?.room?.id || !user) return
@@ -72,6 +80,10 @@ export default function DealRoomPage() {
       toast.info(`Usuario joined`)
     })
 
+    socketService.onOffer((data: any) => handleAcceptCallRef.current?.(data))
+    socketService.onAnswer((data: any) => handleRemoteAnswerRef.current?.(data))
+    socketService.onIceCandidate((data: any) => handleIceCandidateRef.current?.(data))
+
     return () => {
       socketService.leaveRoom(deal.room.id, user.id)
       socketService.removeAllListeners()
@@ -83,6 +95,78 @@ export default function DealRoomPage() {
   }, [messages])
 
   const startCall = async () => {
+    if (!otherUser?.id) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      localStreamRef.current = stream
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream
+      }
+
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+      const analyser = audioContext.createAnalyser()
+      const source = audioContext.createMediaStreamSource(stream)
+      source.connect(analyser)
+      analyser.fftSize = 256
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+      let animationId: number
+      const checkAudioLevel = () => {
+        if (!localStreamRef.current) {
+          setIsSpeaking(false)
+          return
+        }
+        
+        if (!isAudioOnRef.current) {
+          setIsSpeaking(false)
+          animationId = requestAnimationFrame(checkAudioLevel)
+          return
+        }
+        
+        analyser.getByteFrequencyData(dataArray)
+        const average = dataArray.reduce((a, b) => a + b) / dataArray.length
+        const speaking = average > 30
+        setIsSpeaking(speaking)
+        animationId = requestAnimationFrame(checkAudioLevel)
+      }
+      checkAudioLevel()
+
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      })
+      
+      stream.getTracks().forEach(track => pc.addTrack(track, stream))
+      
+      pc.onicecandidate = (e) => {
+        if (e.candidate && otherUser?.id) {
+          socketService.sendIceCandidate(deal.room.id, otherUser.id, e.candidate)
+        }
+      }
+
+      pc.ontrack = (e) => {
+        if (remoteVideoRef.current && e.streams[0]) {
+          remoteVideoRef.current.srcObject = e.streams[0]
+          setHasRemoteStream(true)
+        }
+      }
+
+      peerConnectionRef.current = pc
+
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      socketService.sendOffer(deal.room.id, otherUser.id, offer)
+      
+      setIsInCall(true)
+
+    } catch (err) {
+      console.error('Error al iniciar video:', err)
+      toast.error('Error al iniciar video')
+    }
+  }
+
+  const handleAcceptCall = useCallback(async (data: { offer: RTCSessionDescriptionInit; from: string }) => {
+    if (!otherUser?.id) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       localStreamRef.current = stream
@@ -103,34 +187,77 @@ export default function DealRoomPage() {
       }
 
       pc.ontrack = (e) => {
-        if (remoteVideoRef.current) {
+        if (remoteVideoRef.current && e.streams[0]) {
           remoteVideoRef.current.srcObject = e.streams[0]
+          setHasRemoteStream(true)
         }
       }
 
       peerConnectionRef.current = pc
 
-      socketService.callUser(deal.room.id, otherUser.id)
-      
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer))
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      socketService.sendAnswer(data.from, answer)
+
       setIsInCall(true)
-
-      socketService.onCallAccepted(() => {
-        toast.success('Llamada aceptada')
-      })
-
     } catch (err) {
-      toast.error('Error al iniciar video')
+      console.error('Error al aceptar llamada:', err)
     }
-  }
+  }, [otherUser?.id, deal?.room?.id])
+
+  const handleRemoteAnswer = useCallback(async (data: { answer: RTCSessionDescriptionInit }) => {
+    if (peerConnectionRef.current) {
+      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer))
+    }
+  }, [])
+
+  const handleIceCandidate = useCallback(async (data: { candidate: RTCIceCandidateInit }) => {
+    if (peerConnectionRef.current) {
+      await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate))
+    }
+  }, [])
 
   const endCall = () => {
     localStreamRef.current?.getTracks().forEach(t => t.stop())
     peerConnectionRef.current?.close()
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    setIsSpeaking(false)
+    setHasRemoteStream(false)
     if (otherUser?.id) {
       socketService.endCall(deal.room.id, otherUser.id)
     }
     setIsInCall(false)
   }
+
+  useEffect(() => {
+    if (localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current
+    }
+  }, [localStreamRef.current])
+
+  useEffect(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getVideoTracks().forEach(track => {
+        track.enabled = isVideoOn
+      })
+    }
+  }, [isVideoOn])
+
+  useEffect(() => {
+    isAudioOnRef.current = isAudioOn
+    if (!isAudioOn) {
+      setIsSpeaking(false)
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = isAudioOn
+      })
+    }
+  }, [isAudioOn])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -168,6 +295,10 @@ export default function DealRoomPage() {
     }
     return 'Estoy aquí para ayudarte. Pregúntame sobre el vehículo, el precio, o cualquier aspecto de la negociación.'
   }
+
+  handleAcceptCallRef.current = handleAcceptCall
+  handleRemoteAnswerRef.current = handleRemoteAnswer
+  handleIceCandidateRef.current = handleIceCandidate
 
   if (isLoading) {
     return <div className="p-8"><div className="animate-pulse h-96 bg-[#141416] rounded-2xl" /></div>
@@ -217,9 +348,27 @@ export default function DealRoomPage() {
                 </div>
               ) : (
                 <>
-                  <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                  <div className="absolute bottom-4 right-4 w-48 h-36 rounded-xl overflow-hidden border-2 border-zinc-700">
+                  {hasRemoteStream ? (
+                    <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#1c1c1f]">
+                      <div className="w-24 h-24 rounded-full bg-zinc-700 flex items-center justify-center text-3xl font-semibold text-zinc-400 mb-4">
+                        <User className="w-12 h-12" />
+                      </div>
+                      <p className="text-white font-medium">Esperando a que se una el otro participante...</p>
+                      <p className="text-zinc-500 text-sm">Inicia la llamada para que reciban la invitación</p>
+                    </div>
+                  )}
+                  <div className={`absolute bottom-4 right-4 w-48 h-36 rounded-xl overflow-hidden border-2 transition-all duration-150 ${isSpeaking ? 'border-green-400 shadow-lg shadow-green-400/50' : 'border-zinc-700'}`}>
                     <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover mirror" />
+                    {!isVideoOn && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1c1c1f]">
+                        <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-white">
+                          {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-1">{user?.name || 'Tú'}</p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
