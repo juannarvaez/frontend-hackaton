@@ -535,14 +535,14 @@ export default function DealRoomPage() {
             )}
           </div>
 
-          <div id="conversation-panel" className="flex w-full">
-            <div id="chat" className="w-full h-64 border-t border-[#27272a] flex flex-col">
+          <div id="conversation-panel" className="flex w-full h-96 max-h-96">
+            <div id="chat" className="w-full h-full border-t border-[#27272a] flex flex-col">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-[#27272a]">
                 <MessageCircle className="w-4 h-4 text-zinc-500" />
                 <span className="text-sm font-medium text-white">Chat en Tiempo Real</span>
               </div>
             
-              <div ref={chatContainerRef} className="flex-1 overflow-auto p-4 space-y-3">
+              <div ref={chatContainerRef} className="h-full flex-1 overflow-auto p-4 space-y-3">
                 {messages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[70%] px-4 py-2 rounded-2xl ${
@@ -597,17 +597,13 @@ export default function DealRoomPage() {
             </div>
             <div id="transcription-voice" className="w-full border-t border-l border-[#27272a]">
               <VoiceTranscription 
-                isInCall={isInCall}
-                localStream={localStreamRef.current}
-                remoteStream={remoteVideoRef.current?.srcObject as MediaStream | null}
-                currentUserId={user?.id || ''}
-                otherUserName={otherUser?.name || 'Invitado'}
+                roomId={deal?.room?.id}
               />
             </div>
           </div>
         </div>
 
-        <div className="w-80 border-l border-[#27272a] overflow-auto">
+        <div className="flex-1 border-l border-[#27272a] overflow-auto">
           <div className="p-4 border-b border-[#27272a]">
             <h2 className="font-semibold text-white mb-3">Información del Vehículo</h2>
             <div className="aspect-video bg-[#1c1c1f] rounded-xl mb-3 overflow-hidden">
@@ -638,6 +634,12 @@ export default function DealRoomPage() {
                 </div>
               </div>
             )}
+            <div id="ia-deal-assistant" className="mt-3 p-3 bg-[#1c1c1f] rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-4 h-4 text-primary-400" />
+                  <span className="text-sm text-white">IA Assistant</span>
+                </div>
+              </div>
           </div>
 
           <div className="p-4 border-b border-[#27272a]">

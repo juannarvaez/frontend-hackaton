@@ -58,9 +58,9 @@ export default function App() {
         <Route path="vehicles/new" element={<CreateVehiclePage />} />
         <Route path="vehicles/:id" element={<VehicleDetailPage />} />
         <Route path="rooms" element={<RoomsPage />} />
-        <Route path="deals/:id" element={<DealRoomPage />} />
         <Route path="voice-transcription" element={<VoiceTranscriptionPage />} />
       </Route>
+      <Route path="deals/:id" element={<DealRoomPage />} />
     </Routes>
   )
 }

@@ -103,6 +103,18 @@ class SocketService {
     this.socket?.on('webrtc-ice-candidate', callback)
   }
 
+  sendVoiceTranscript(roomId: string, userId: string, content: string) {
+    this.socket?.emit('voice-transcript', { roomId, userId, content })
+  }
+
+  onVoiceTranscript(callback: (transcript: any) => void) {
+    this.socket?.on('voice-transcript', callback)
+  }
+
+  offVoiceTranscript() {
+    this.socket?.off('voice-transcript')
+  }
+
   removeAllListeners() {
     this.socket?.removeAllListeners()
   }

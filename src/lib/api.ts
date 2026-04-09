@@ -63,4 +63,7 @@ export const roomsApi = {
   sendMessage: (id: string, data: { content: string; type?: string }) =>
     api.post(`/rooms/${id}/messages`, data),
   getParticipants: (id: string) => api.get(`/rooms/${id}/participants`),
+  getVoiceTranscripts: (id: string) => api.get(`/rooms/${id}/transcripts`),
+  addVoiceTranscript: (id: string, data: { content: string }) =>
+    api.post(`/rooms/${id}/transcripts`, data),
 }
