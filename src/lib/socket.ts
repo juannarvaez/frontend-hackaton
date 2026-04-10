@@ -4,22 +4,42 @@ const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 class SocketService {
   private socket: Socket | null = null
+  private connectionPromise: Promise<void> | null = null
+  private resolveConnection: (() => void) | null = null
 
-  connect() {
-    if (this.socket?.connected) return
+  connect(): Promise<void> {
+    if (this.socket?.connected) return Promise.resolve()
+    
+    if (this.connectionPromise) return this.connectionPromise
 
     this.socket = io(SOCKET_URL, {
       transports: ['websocket'],
       autoConnect: true,
     })
 
-    this.socket.on('connect', () => {
-      console.log('Socket connected')
+    console.log('Socket created, id:', this.socket.id)
+
+    this.connectionPromise = new Promise((resolve) => {
+      this.resolveConnection = resolve
+      this.socket?.on('connect', () => {
+        console.log('Socket connected, id:', this.socket?.id)
+        resolve()
+      })
     })
 
     this.socket.on('disconnect', () => {
       console.log('Socket disconnected')
+      this.connectionPromise = null
+      this.resolveConnection = null
     })
+
+    return this.connectionPromise
+  }
+
+  async ensureConnectedAndReady(): Promise<Socket | null> {
+    await this.connect()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    return this.socket
   }
 
   disconnect() {
@@ -28,11 +48,15 @@ class SocketService {
   }
 
   authenticate(userId: string) {
-    this.socket?.emit('authenticate', { userId })
+    this.ensureConnectedAndReady().then(socket => {
+      socket?.emit('authenticate', { userId })
+    })
   }
 
   joinRoom(roomId: string, userId: string) {
-    this.socket?.emit('join-room', { roomId, userId })
+    this.ensureConnectedAndReady().then(socket => {
+      socket?.emit('join-room', { roomId, userId })
+    })
   }
 
   leaveRoom(roomId: string, userId: string) {
@@ -40,7 +64,10 @@ class SocketService {
   }
 
   sendChatMessage(roomId: string, userId: string, content: string) {
-    this.socket?.emit('chat-message', { roomId, userId, content })
+    this.ensureConnectedAndReady().then(socket => {
+      console.log('Sending chat-message - socket id:', socket?.id, 'roomId:', roomId)
+      socket?.emit('chat-message', { roomId, userId, content })
+    })
   }
 
   onChatMessage(callback: (message: any) => void) {
@@ -114,6 +141,38 @@ class SocketService {
   offVoiceTranscript() {
     this.socket?.off('voice-transcript')
   }
+
+  sendVehicleTabChange(roomId: string, tab: string) {
+    this.ensureConnectedAndReady().then(socket => {
+      console.log('Socket sendVehicleTabChange - socket connected:', socket?.connected, 'roomId:', roomId, 'tab:', tab)
+      socket?.emit('vehicle-tab-change', { roomId, tab })
+    })
+  }
+
+  onVehicleTabChange(callback: (data: { tab: string }) => void) {
+    this.socket?.on('vehicle-tab-change', callback)
+  }
+
+  offVehicleTabChange() {
+    this.socket?.off('vehicle-tab-change')
+  }
+
+
+  sendVehicleImageSelectedChange(roomId: string, imageIndex: number) {
+    this.ensureConnectedAndReady().then(socket => {
+      console.log('Socket sendVehicleTabChange - socket connected:', socket?.connected, 'roomId:', roomId, 'imageIndex:', imageIndex)
+      socket?.emit('vehicle-image-selected-change', { roomId, imageIndex })
+    })
+  }
+
+  onVehicleImageSelectedChange(callback: (data: { imageIndex: number }) => void) {
+    this.socket?.on('vehicle-image-selected-change', callback)
+  }
+
+  offVehicleImageSelectedChange() {
+    this.socket?.off('vehicle-image-selected-change')
+  }
+
 
   removeAllListeners() {
     this.socket?.removeAllListeners()

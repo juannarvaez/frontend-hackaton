@@ -92,6 +92,18 @@ export default function DealRoomPage() {
     socketService.onChatMessage((msg) => {
       setMessages((prev) => [...prev, msg])
     })
+   
+    socketService.onVehicleTabChange((msg: {tab: string}) => {
+      if (msg?.tab) {
+        setVehicleTab(msg?.tab)
+      }
+    })
+   
+    socketService.onVehicleImageSelectedChange((msg) => {
+      setSelectedImageIndex(msg.imageIndex)
+    })
+   
+ 
 
     socketService.onUserJoined(({ userId }) => {
       console.log('User joined:', userId)
@@ -623,7 +635,10 @@ export default function DealRoomPage() {
               
               <div className="flex gap-2 mb-3">
                 <button
-                  onClick={() => setVehicleTab('info')}
+                  onClick={() => {
+                    setVehicleTab('info')
+                    socketService.sendVehicleTabChange(deal?.room?.id, 'info')
+                  }}
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                     vehicleTab === 'info' ? 'bg-primary-500 text-white' : 'bg-[#1c1c1f] text-zinc-400 hover:text-white'
                   }`}
@@ -631,7 +646,10 @@ export default function DealRoomPage() {
                   Info
                 </button>
                 <button
-                  onClick={() => setVehicleTab('images')}
+                  onClick={() => {
+                    setVehicleTab('images')
+                    socketService.sendVehicleTabChange(deal?.room?.id, 'images')
+                  }}
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                     vehicleTab === 'images' ? 'bg-primary-500 text-white' : 'bg-[#1c1c1f] text-zinc-400 hover:text-white'
                   }`}
@@ -716,7 +734,10 @@ export default function DealRoomPage() {
                         {getVehicleImages(vehicle).map((img, idx) => (
                           <button
                             key={idx}
-                            onClick={() => setSelectedImageIndex(idx)}
+                            onClick={() => {
+                              setSelectedImageIndex(idx)
+                              socketService.sendVehicleImageSelectedChange(deal?.room?.id, idx)
+                            }}
                             className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
                               idx === selectedImageIndex 
                                 ? 'border-primary-500 ring-2 ring-primary-500/50' 
@@ -732,14 +753,20 @@ export default function DealRoomPage() {
                         <span>{selectedImageIndex + 1} / {getVehicleImages(vehicle).length}</span>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setSelectedImageIndex(Math.max(0, selectedImageIndex - 1))}
+                            onClick={() => {
+                              setSelectedImageIndex(Math.max(0, selectedImageIndex - 1))
+                              socketService.sendVehicleImageSelectedChange(deal?.room?.id, Math.max(0, selectedImageIndex - 1))
+                            }}
                             disabled={selectedImageIndex === 0}
                             className="p-2 bg-[#1c1c1f] rounded-lg hover:bg-[#27272a] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             ←
                           </button>
                           <button
-                            onClick={() => setSelectedImageIndex(Math.min(getVehicleImages(vehicle).length - 1, selectedImageIndex + 1))}
+                            onClick={() => {
+                              setSelectedImageIndex(Math.min(getVehicleImages(vehicle).length - 1, selectedImageIndex + 1))
+                              socketService.sendVehicleImageSelectedChange(deal?.room?.id, Math.min(getVehicleImages(vehicle).length - 1, selectedImageIndex + 1))
+                            }}
                             disabled={selectedImageIndex === getVehicleImages(vehicle).length - 1}
                             className="p-2 bg-[#1c1c1f] rounded-lg hover:bg-[#27272a] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
